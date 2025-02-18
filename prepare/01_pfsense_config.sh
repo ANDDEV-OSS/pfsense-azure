@@ -38,6 +38,18 @@ ${TAB}${TAB}<serialspeed>115200</serialspeed>\\
     else
         echo "<serialspeed>115200</serialspeed> already exists in the <system> block."
     fi
+
+    # Check if <nohttpreferercheck> exists
+    if ! grep -q "<nohttpreferercheck></nohttpreferercheck>" "$CONFIG_FILE"; then
+        # Insert <nohttpreferercheck></nohttpreferercheck> before </webgui> with proper tab and newline
+        sed -i '' "/<\/webgui>/i\\
+${TAB}${TAB}${TAB}<nohttpreferercheck></nohttpreferercheck>\\
+" "$CONFIG_FILE"
+        echo "<nohttpreferercheck></nohttpreferercheck> added before </webgui> in <system> block with proper indentation."
+    else
+        echo "<nohttpreferercheck></nohttpreferercheck> already exists in the <webgui> block."
+    fi
+
 else
     echo "Error: <system> block not found in $CONFIG_FILE"
     exit 1
