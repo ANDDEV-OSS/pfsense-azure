@@ -36,9 +36,10 @@ vnet_subnets=$(cat <<EOF
 ]
 EOF
 )
-vmName="vm-${loc}-corp-${env}-pfsense-00"
+vmName="vm-${loc}-${org}-${env}-pfsense"
 vmSize="Standard_D2ls_v5"
 vhdUri="https://${sa_account_name}.blob.core.windows.net/vhds/pfsense.vhd"
+nsg_name="nsg-${loc}-${org}-${env}-pfsense-ext"
 
 az config set core.display_region_identified=false # stop warning about cheaper in alternative region
 
@@ -84,8 +85,8 @@ public_ip_id=$(az network public-ip create --name "pubip-${loc}-pfsense-${env}" 
 
 # Create NICs
 echo "Creating Network Interfaces"
-nic_ext_id=$(az network nic create --name "vnic-${loc}-pfsense-${env}-ext" --resource-group "${rgp_pfsense}" --location "${location}" --subnet "${snet_external_id}" --public-ip-address "${public_ip_id}" --query "id" -o tsv)
-nic_int_id=$(az network nic create --name "vnic-${loc}-pfsense-${env}-int" --resource-group "${rgp_pfsense}" --location "${location}" --subnet "${snet_internal_id}" --query "id" -o tsv)
+az network nic create --name "vnic-${loc}-pfsense-${env}-ext" --resource-group "${rgp_pfsense}" --location "${location}" --subnet "${snet_external_id}" --public-ip-address "${public_ip_id}" -o table
+az network nic create --name "vnic-${loc}-pfsense-${env}-int" --resource-group "${rgp_pfsense}" --location "${location}" --subnet "${snet_internal_id}" -o table
 
 echo "Creating Image"
 az image create --resource-group "${rgp_pfsense}" --name PfSenseImage --source "${vhdUri}" --os-type Linux --hyper-v-generation V2 -o table
@@ -101,4 +102,13 @@ az vm create --resource-group "${rgp_pfsense}" --name "${vmName}" \
   --encryption-at-host --os-disk-name "${vmName}-osdisk" \
   -o table
 
-  az vm boot-diagnostics enable --name "${vnName}" --resource-group "${rgp_pfsense}" -o table
+echo "Enable Boot Diagnostics"
+az vm boot-diagnostics enable --name "${vmName}" --resource-group "${rgp_pfsense}" -o table
+
+echo "Create Network Security Group"
+az network nsg create --resource-group "${rgp_pfsense}" --name "${nsg_name}" -o table
+
+az network nsg rule create --resource-group "${rgp_pfsense}" --nsg-name "${nsg_name}" --name "AllowAnyHTTPSInbound" \
+  --source-address-prefixes Internet --destination-port-ranges 443 --access Allow --protocol Tcp --priority 100 -o table
+
+az network nic update --name "vnic-${loc}-pfsense-${env}-ext" --resource-group "${rgp_pfsense}" --network-security-group "${nsg_name}" -o table
